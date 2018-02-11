@@ -1,0 +1,96 @@
+---
+title: "Practical Machine Learning: Week 4 Assignment"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## GOAL 
+ Quantified Self Movement Data
+
+In this project, the goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways (A,B,C,D,E - the classe variable)
+The goal is to build a model to predict the manner in which they did the exercise.
+
+The data was downloaded into the working directory and the data was loaded into R through read.csv function
+
+```{r}
+training <- read.csv("C:/Users/tamma/Documents/pml-training.csv", stringsAsFactors = FALSE)
+testing <- read.csv("C:/Users/tamma/Documents/pml-testing.csv", stringsAsFactors = FALSE)
+
+```
+We  are finding the dimensions of both training and testing data sets
+```{r}
+dim(training)
+dim(testing)
+
+```
+So, we can see that there are  160 columns of data (variables). With 19,622 observations in the training set and 20 in the testing dataset.
+ ##Data Prepocessing 
+Removing all the columns having NA values or Blanks as they are recorded for specific window time frame
+```{r}
+ 
+training<-training[,!apply(training,2,function(x)any(is.na(x)))]
+training<-training[,!apply(training,2,function(x)any(x==""))]
+testing<-testing[,!apply(testing,2,function(x)any(is.na(x)))]
+testing<-testing[,!apply(testing,2,function(x)any(x==""))]
+dim(training)
+dim(testing)
+```
+Now removing all the variables i.e 1 to 6 columns, which are mere identifiers and are not needed for the analysis.
+
+```{r}
+training <- training[, 7:60]
+testing  <- testing[, 7:60]
+```
+Now we are going partition the training data set into cross validation sets of 60% training set and 40% testing set and loading the caret package required for the further analysis
+```{r}
+library(caret)
+set.seed(113)
+Training_cv <- createDataPartition(y=training$classe, p=0.60, list=FALSE)
+train_cv<- training[Training_cv,]
+test_cv<- training[-Training_cv,]
+dim(train_cv)
+dim(test_cv)
+```
+
+we can see that there are 54 columns of data (variables). With 11776 observations in the training set and 7846 in the testing dataset.
+Now, we are using Decision tree algorithm for prediction of classification of "classe" variable
+
+Prediction using decision trees
+```{r}
+set.seed(113)
+modfit_dt<-train(classe~.,method="rpart",data=train_cv)
+print(modfit_dt$finalModel)
+prediction <- predict(modfit_dt, newdata=test_cv)
+confmat<-table(prediction,test_cv$classe)
+accuracy<-sum(diag(confmat))/sum(confmat)
+print(accuracy)
+```
+As it is observed that accuracy is very low( 49.5%) i.e Out of sample error is high(50.5%).So, next we will be using Random forest algorithm for class prediction.
+
+
+Plotting the decision tree with the help of fancyRpartplot function in  rattle package
+
+
+```{r}
+library(rattle)
+fancyRpartPlot(modfit_dt$finalModel)
+```
+
+We are doing Prediction using random forest algorithm as it is very accurate for classification prediction. We are also using trainControl function with cross-validation Resampling method( 4 folds) to reduce the computation time of the algorithm,otherwise it was taking too long to compute.
+```{r}
+set.seed(113)
+ctrl <- trainControl(allowParallel=T, method="cv", number=4)
+modfit_rf <- train(classe ~ ., data=train_cv, model="rf", trControl=ctrl)
+print(modfit_rf)
+prediction2 <- predict(modfit_rf, newdata=test_cv)
+confmat2<-table(prediction2,test_cv$classe)
+```
+Accuracy observed was 99.53% with repeated trees=27, So the expected out of sample error is (100-99.53)=0.47%
+
+Now we are predicting the "classe" for 20 cases in testing data set
+```{r}
+
+predict(modfit_rf, newdata=testing)
+```
